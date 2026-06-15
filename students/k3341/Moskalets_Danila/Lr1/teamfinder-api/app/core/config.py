@@ -5,6 +5,8 @@ from pydantic import ConfigDict
 class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5439/teamfinder"
+
+    REDIS_URL: str = "redis://localhost:6379/0"
     
     # JWT
     SECRET_KEY: str = "your-secret-key-change-in-production"

@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # PostgreSQL для основного приложения и парсера
   postgres:
     image: postgres:15-alpine
     container_name: teamfinder-postgres
@@ -17,6 +18,83 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - teamfinder_network
+
+  # Redis (брокер для Celery)
+  redis:
+    image: redis:7-alpine
+    container_name: teamfinder-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - teamfinder_network
+
+  # FastAPI приложение
+  api:
+    build: .
+    container_name: teamfinder-api
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:password@postgres:5432/teamfinder
+      REDIS_URL: redis://redis:6379/0
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app/app
+    networks:
+      - teamfinder_network
+
+  # Celery Worker (асинхронная обработка задач)
+  celery_worker:
+    build: .
+    container_name: teamfinder-celery-worker
+    command: celery -A app.tasks.celery_app worker --loglevel=info --queues=parser
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:password@postgres:5432/teamfinder
+      REDIS_URL: redis://redis:6379/0
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app/app
+    networks:
+      - teamfinder_network
+
+  # Celery Beat (для периодических задач, опционально)
+  celery_beat:
+    build: .
+    container_name: teamfinder-celery-beat
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    depends_on:
+      - redis
+      - postgres
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:password@postgres:5432/teamfinder
+      REDIS_URL: redis://redis:6379/0
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app/app
+    networks:
+      - teamfinder_network
 
 volumes:
   postgres_data:
+
+networks:
+  teamfinder_network:
+    driver: bridge

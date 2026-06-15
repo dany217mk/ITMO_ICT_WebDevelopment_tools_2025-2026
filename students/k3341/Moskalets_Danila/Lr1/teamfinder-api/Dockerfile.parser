@@ -1,0 +1,18 @@
+# Dockerfile для отдельного парсер-сервиса (необязательно, но по заданию)
+FROM python:3.11-slim
+
+WORKDIR /parser
+
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY parser/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY parser/ .
+
+ENV PYTHONPATH=/parser
+
+CMD ["python", "-c", "print('Parser service ready')"]
