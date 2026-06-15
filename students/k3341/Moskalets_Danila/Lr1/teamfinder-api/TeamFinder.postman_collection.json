@@ -1,0 +1,1007 @@
+{
+  "info": {
+    "_postman_id": "teamfinder-api-tests",
+    "name": "TeamFinder API Tests",
+    "description": "Комплексный Postman сценарий для TeamFinder API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('runId')) {",
+          "  const runId = Date.now().toString();",
+          "  pm.collectionVariables.set('runId', runId);",
+          "  pm.collectionVariables.set('testEmail1', `user1-${runId}@test.com`);",
+          "  pm.collectionVariables.set('testEmail2', `user2-${runId}@test.com`);",
+          "  pm.collectionVariables.set('projectTitle', `Test Project ${runId}`);",
+          "  pm.collectionVariables.set('teamName', `Test Team ${runId}`);",
+          "}",
+          "pm.collectionVariables.set('password', pm.collectionVariables.get('password') || 'Test12345');"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "apiPrefix",
+      "value": "api/v1",
+      "type": "string"
+    },
+    {
+      "key": "runId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "password",
+      "value": "Test12345",
+      "type": "string"
+    },
+    {
+      "key": "testEmail1",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testEmail2",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "projectTitle",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "teamName",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user1AccessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user1RefreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user1Id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user2AccessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user2Id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "projectId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "skillId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "teamId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "taskId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "health"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('API is alive', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().status).to.eql('ok');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Register User 1",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"first_name\": \"Test\",\n  \"last_name\": \"User1\",\n  \"email\": \"{{testEmail1}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/auth/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "auth", "register"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('User 1 registered', function () {",
+              "  pm.response.to.have.status(201);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.email).to.eql(pm.collectionVariables.get('testEmail1'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Register User 2",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"first_name\": \"Test\",\n  \"last_name\": \"User2\",\n  \"email\": \"{{testEmail2}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/auth/register",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "auth", "register"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('User 2 registered', function () {",
+              "  pm.response.to.have.status(201);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Login User 1",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{testEmail1}}\",\n  \"password\": \"{{password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "auth", "login"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('User 1 logged in', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.access_token).to.be.a('string');",
+              "  pm.collectionVariables.set('user1AccessToken', json.access_token);",
+              "  pm.collectionVariables.set('user1RefreshToken', json.refresh_token);",
+              "  pm.collectionVariables.set('user1Id', json.user_id || 1);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Get Current User",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/auth/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "auth", "me"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Get current user info', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.email).to.eql(pm.collectionVariables.get('testEmail1'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Get All Skills",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/skills",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "skills"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Skills list returned', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.length).to.be.at.least(1);",
+              "  if (json.length > 0) {",
+              "    pm.collectionVariables.set('skillId', json[0].id.toString());",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Create Project",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"{{projectTitle}}\",\n  \"description\": \"Test project created by Postman scenario\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/projects",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "projects"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Project created', function () {",
+              "  pm.response.to.have.status(201);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.title).to.eql(pm.collectionVariables.get('projectTitle'));",
+              "  pm.collectionVariables.set('projectId', json.id.toString());",
+              "  console.log('Project ID saved:', pm.collectionVariables.get('projectId'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 Get Projects List",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/projects?page=1&page_size=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "projects"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "page_size",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Projects listed', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.items.length).to.be.at.least(1);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 Get Project by ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/projects/{{projectId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "projects", "{{projectId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Project details available', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.id.toString()).to.eql(pm.collectionVariables.get('projectId'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 Add Skill to Project",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"skill_id\": {{skillId}},\n  \"importance\": \"REQUIRED\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/projects/{{projectId}}/skills",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "projects", "{{projectId}}", "skills"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Skill added to project', function () {",
+              "  pm.response.to.have.status(201);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 Create Team in Project",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"{{teamName}}\",\n  \"description\": \"Test team for the project\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/projects/{{projectId}}/teams",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "projects", "{{projectId}}", "teams"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Team created', function () {",
+              "  pm.response.to.have.status(201);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.name).to.eql(pm.collectionVariables.get('teamName'));",
+              "  pm.collectionVariables.set('teamId', json.id.toString());",
+              "  console.log('Team ID saved:', pm.collectionVariables.get('teamId'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 Get Team Details",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/teams/{{teamId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "teams", "{{teamId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Team details available', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.id.toString()).to.eql(pm.collectionVariables.get('teamId'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 Get Team Members",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/teams/{{teamId}}/members",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "teams", "{{teamId}}", "members"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Team members listed', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 Create Task in Project",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Implement API endpoint\",\n  \"description\": \"Create the main endpoint for the project\",\n  \"priority\": \"HIGH\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/projects/{{projectId}}/tasks",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "projects", "{{projectId}}", "tasks"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Task created', function () {",
+              "  pm.response.to.have.status(201);",
+              "  const json = pm.response.json();",
+              "  pm.collectionVariables.set('taskId', json.id.toString());",
+              "  console.log('Task ID saved:', pm.collectionVariables.get('taskId'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 Get Project Tasks",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/projects/{{projectId}}/tasks?page=1&page_size=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "projects", "{{projectId}}", "tasks"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "page_size",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Tasks listed', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 Update Task Status",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/tasks/{{taskId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "tasks", "{{taskId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Task updated', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.status).to.eql('IN_PROGRESS');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 Get My Tasks",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/tasks/my-tasks?page=1&page_size=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "tasks", "my-tasks"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "page_size",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('My tasks listed', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 Get My Stats",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/users/me/stats",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "users", "me", "stats"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Stats returned', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json).to.have.property('total_projects_owned');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "19 Update My Profile",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"bio\": \"Updated bio from Postman test scenario\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/users/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "users", "me"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Profile updated', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "20 Get Users List (Pagination)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/users?page=1&page_size=10",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "users"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "page_size",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Users list with pagination', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json).to.have.property('items');",
+              "  pm.expect(json).to.have.property('pagination');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "21 Search Users by Name",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/users?search=Test",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "users"],
+          "query": [
+            {
+              "key": "search",
+              "value": "Test"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Search users by name', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "22 Search Projects",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/projects?search=Test",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "projects"],
+          "query": [
+            {
+              "key": "search",
+              "value": "Test"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Search projects', function () {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "23 Delete Task",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/tasks/{{taskId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "tasks", "{{taskId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Task deleted', function () {",
+              "  pm.response.to.have.status(204);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "24 Delete Team",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/teams/{{teamId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "teams", "{{teamId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Team deleted', function () {",
+              "  pm.response.to.have.status(204);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "25 Delete Project",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{user1AccessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/{{apiPrefix}}/projects/{{projectId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{apiPrefix}}", "projects", "{{projectId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Project deleted', function () {",
+              "  pm.response.to.have.status(204);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

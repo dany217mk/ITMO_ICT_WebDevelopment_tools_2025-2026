@@ -1,0 +1,1708 @@
+openapi: 3.1.0
+info:
+  title: TeamFinder API
+  description: Платформа для поиска людей в команду для совместной работы над проектами
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+tags:
+  - name: auth
+    description: Аутентификация и авторизация
+  - name: users
+    description: Управление пользователями и профилями
+  - name: skills
+    description: Справочник навыков
+  - name: projects
+    description: Управление проектами
+  - name: teams
+    description: Управление командами
+  - name: tasks
+    description: Управление задачами
+  - name: admin
+    description: Администрирование
+
+paths:
+
+  # ─── AUTH ────────────────────────────────────────────────
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Регистрация нового пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Пользователь создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Вход в систему (получение JWT)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Успешный вход
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [auth]
+      summary: Обновить access-токен
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refresh_token
+              properties:
+                refresh_token:
+                  type: string
+                  description: Refresh-токен из предыдущего ответа
+      responses:
+        '200':
+          description: Новая пара токенов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: Получить текущего пользователя
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Данные текущего пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ─── USERS ───────────────────────────────────────────────
+  /users:
+    get:
+      tags: [users]
+      summary: Поиск и фильтрация пользователей
+      parameters:
+        - name: skill_ids
+          in: query
+          description: Фильтр по ID навыков (можно несколько)
+          schema:
+            type: array
+            items:
+              type: integer
+        - name: proficiency_level
+          in: query
+          schema:
+            $ref: '#/components/schemas/ProficiencyLevel'
+        - name: search
+          in: query
+          description: Поиск по имени или bio
+          schema:
+            type: string
+        - name: sort_by
+          in: query
+          description: Поле для сортировки
+          schema:
+            type: string
+            enum: [created_at, first_name, last_name]
+            default: created_at
+        - name: sort_order
+          in: query
+          description: Направление сортировки
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: page
+          in: query
+          description: Номер страницы (1-based)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          description: Количество записей на странице
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Список пользователей с пагинацией
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserListResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /users/{user_id}:
+    get:
+      tags: [users]
+      summary: Получить профиль пользователя
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Профиль пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetailResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/me:
+    patch:
+      tags: [users]
+      summary: Обновить свой профиль
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Обновлённый профиль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /users/me/change-password:
+    post:
+      tags: [users]
+      summary: Смена пароля текущего пользователя
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - old_password
+                - new_password
+              properties:
+                old_password:
+                  type: string
+                  description: Текущий пароль
+                new_password:
+                  type: string
+                  minLength: 8
+                  description: Новый пароль (минимум 8 символов)
+      responses:
+        '200':
+          description: Пароль успешно изменен
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Password changed successfully
+        '400':
+          description: Неверный текущий пароль
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /users/me/stats:
+    get:
+      tags: [users]
+      summary: Получить статистику текущего пользователя
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Статистика пользователя
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserStatsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/me/skills:
+    get:
+      tags: [users]
+      summary: Получить навыки текущего пользователя
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Список навыков
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserSkillResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [users]
+      summary: Добавить навык текущему пользователю
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddUserSkillRequest'
+      responses:
+        '201':
+          description: Навык добавлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSkillResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Навык уже добавлен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /users/me/skills/{skill_id}:
+    delete:
+      tags: [users]
+      summary: Удалить навык у текущего пользователя
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SkillId'
+      responses:
+        '204':
+          description: Навык удалён
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── SKILLS ──────────────────────────────────────────────
+  /skills:
+    get:
+      tags: [skills]
+      summary: Получить список всех навыков
+      parameters:
+        - name: category
+          in: query
+          description: Фильтр по категории
+          schema:
+            type: string
+        - name: search
+          in: query
+          description: Поиск по названию навыка
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Список навыков
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SkillResponse'
+
+    post:
+      tags: [skills]
+      summary: Создать навык (только ADMIN)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSkillRequest'
+      responses:
+        '201':
+          description: Навык создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Навык с таким названием уже существует
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ─── PROJECTS ────────────────────────────────────────────
+  /projects:
+    get:
+      tags: [projects]
+      summary: Поиск и фильтрация проектов
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ProjectStatus'
+        - name: skill_ids
+          in: query
+          description: Фильтр по ID требуемых навыков
+          schema:
+            type: array
+            items:
+              type: integer
+        - name: owner_id
+          in: query
+          description: Фильтр по владельцу проекта
+          schema:
+            type: integer
+        - name: search
+          in: query
+          description: Поиск по названию или описанию
+          schema:
+            type: string
+        - name: sort_by
+          in: query
+          description: Поле для сортировки
+          schema:
+            type: string
+            enum: [created_at, deadline, title]
+            default: created_at
+        - name: sort_order
+          in: query
+          description: Направление сортировки
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: page
+          in: query
+          description: Номер страницы (1-based)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          description: Количество записей на странице
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Список проектов с пагинацией
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectListResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    post:
+      tags: [projects]
+      summary: Создать проект
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProjectRequest'
+      responses:
+        '201':
+          description: Проект создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /projects/{project_id}:
+    get:
+      tags: [projects]
+      summary: Получить проект по ID
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Проект
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectDetailResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [projects]
+      summary: Обновить проект (только владелец)
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProjectRequest'
+      responses:
+        '200':
+          description: Обновлённый проект
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [projects]
+      summary: Удалить проект (только владелец или ADMIN)
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '204':
+          description: Проект удалён
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/skills:
+    get:
+      tags: [projects]
+      summary: Получить все требуемые навыки проекта
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      responses:
+        '200':
+          description: Список требуемых навыков
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectSkillResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [projects]
+      summary: Добавить требуемый навык к проекту
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddProjectSkillRequest'
+      responses:
+        '201':
+          description: Навык добавлен к проекту
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectSkillResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{project_id}/skills/{skill_id}:
+    delete:
+      tags: [projects]
+      summary: Удалить навык из проекта
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - $ref: '#/components/parameters/SkillId'
+      responses:
+        '204':
+          description: Навык удалён
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── TEAMS ───────────────────────────────────────────────
+  /projects/{project_id}/teams:
+    get:
+      tags: [teams]
+      summary: Получить команды проекта
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Список команд с пагинацией
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamListResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [teams]
+      summary: Создать команду в проекте
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTeamRequest'
+      responses:
+        '201':
+          description: Команда создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /teams/{team_id}:
+    get:
+      tags: [teams]
+      summary: Получить команду по ID
+      parameters:
+        - $ref: '#/components/parameters/TeamId'
+      responses:
+        '200':
+          description: Команда
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamDetailResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [teams]
+      summary: Обновить команду (тимлид или владелец проекта)
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTeamRequest'
+      responses:
+        '200':
+          description: Обновлённая команда
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [teams]
+      summary: Удалить команду (тимлид или владелец проекта)
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamId'
+      responses:
+        '204':
+          description: Команда удалена
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /teams/{team_id}/members:
+    get:
+      tags: [teams]
+      summary: Получить всех участников команды
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamId'
+      responses:
+        '200':
+          description: Список участников
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TeamMemberResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [teams]
+      summary: Пригласить пользователя в команду
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InviteMemberRequest'
+      responses:
+        '201':
+          description: Приглашение отправлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMemberResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /teams/{team_id}/members/{user_id}:
+    patch:
+      tags: [teams]
+      summary: Обновить статус или роль участника
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamId'
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMemberRequest'
+      responses:
+        '200':
+          description: Участник обновлён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMemberResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [teams]
+      summary: Удалить участника из команды
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TeamId'
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '204':
+          description: Участник удалён
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── TASKS ───────────────────────────────────────────────
+  /projects/{project_id}/tasks:
+    get:
+      tags: [tasks]
+      summary: Получить задачи проекта
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/TaskStatus'
+        - name: assignee_id
+          in: query
+          schema:
+            type: integer
+        - name: priority
+          in: query
+          schema:
+            $ref: '#/components/schemas/TaskPriority'
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [created_at, due_date, priority]
+            default: created_at
+        - name: sort_order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Список задач с пагинацией
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskListResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [tasks]
+      summary: Создать задачу в проекте
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ProjectId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+      responses:
+        '201':
+          description: Задача создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tasks/{task_id}:
+    get:
+      tags: [tasks]
+      summary: Получить задачу по ID
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Задача
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [tasks]
+      summary: Обновить задачу
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTaskRequest'
+      responses:
+        '200':
+          description: Обновлённая задача
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [tasks]
+      summary: Удалить задачу
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '204':
+          description: Задача удалена
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── ADMIN ───────────────────────────────────────────────
+  /admin/stats:
+    get:
+      tags: [admin]
+      summary: Получить общую статистику по платформе (только ADMIN)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Общая статистика
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminStatsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+# ─── COMPONENTS ──────────────────────────────────────────────────────────────
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UserId:
+      name: user_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: ID пользователя
+    SkillId:
+      name: skill_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: ID навыка
+    ProjectId:
+      name: project_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: ID проекта
+    TeamId:
+      name: team_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: ID команды
+    TaskId:
+      name: task_id
+      in: path
+      required: true
+      schema:
+        type: integer
+      description: ID задачи
+
+  responses:
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Не авторизован
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Недостаточно прав
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ValidationError:
+      description: Ошибка валидации
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
+
+  schemas:
+
+    # ── ENUMS ──
+    UserRole:
+      type: string
+      enum: [ADMIN, USER]
+      description: Роль пользователя
+
+    ProficiencyLevel:
+      type: string
+      enum: [BEGINNER, INTERMEDIATE, ADVANCED, EXPERT]
+      description: Уровень владения навыком
+
+    ProjectStatus:
+      type: string
+      enum: [DRAFT, OPEN, IN_PROGRESS, COMPLETED, ARCHIVED]
+      description: Статус проекта
+
+    TeamRole:
+      type: string
+      enum: [LEAD, MEMBER, OBSERVER]
+      description: Роль в команде
+
+    MemberStatus:
+      type: string
+      enum: [INVITED, ACTIVE, LEFT, REMOVED]
+      description: Статус участника команды
+
+    SkillImportance:
+      type: string
+      enum: [NICE_TO_HAVE, IMPORTANT, REQUIRED]
+      description: Важность навыка для проекта
+
+    TaskStatus:
+      type: string
+      enum: [TODO, IN_PROGRESS, REVIEW, DONE]
+      description: Статус задачи
+
+    TaskPriority:
+      type: string
+      enum: [LOW, MEDIUM, HIGH, CRITICAL]
+      description: Приоритет задачи
+
+    # ── ПАГИНАЦИЯ ──
+    Pagination:
+      type: object
+      required: [total, page, page_size, total_pages]
+      properties:
+        total:
+          type: integer
+          description: Общее количество записей
+          example: 150
+        page:
+          type: integer
+          description: Текущая страница (1-based)
+          minimum: 1
+          example: 2
+        page_size:
+          type: integer
+          description: Размер страницы
+          minimum: 1
+          maximum: 100
+          example: 20
+        total_pages:
+          type: integer
+          description: Всего страниц
+          example: 8
+
+    # ── AUTH ──
+    RegisterRequest:
+      type: object
+      required: [first_name, last_name, email, password]
+      properties:
+        first_name:
+          type: string
+          maxLength: 64
+          example: John
+        last_name:
+          type: string
+          maxLength: 64
+          example: Doe
+        email:
+          type: string
+          format: email
+          example: john.doe@example.com
+        password:
+          type: string
+          minLength: 8
+          example: securepassword123
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: john.doe@example.com
+        password:
+          type: string
+          example: securepassword123
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refresh_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        token_type:
+          type: string
+          example: bearer
+
+    # ── USERS ──
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        role:
+          $ref: '#/components/schemas/UserRole'
+        first_name:
+          type: string
+          example: John
+        last_name:
+          type: string
+          example: Doe
+        email:
+          type: string
+          example: john.doe@example.com
+        avatar_url:
+          type: string
+          nullable: true
+          example: https://example.com/avatar.jpg
+        bio:
+          type: string
+          nullable: true
+          example: Passionate developer
+        is_verified:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          example: 2024-01-01T00:00:00Z
+
+    UserDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/UserResponse'
+        - type: object
+          properties:
+            skills:
+              type: array
+              items:
+                $ref: '#/components/schemas/UserSkillResponse'
+
+    UserListResponse:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserResponse'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+          maxLength: 64
+          example: John
+        last_name:
+          type: string
+          maxLength: 64
+          example: Doe
+        bio:
+          type: string
+          example: Updated bio
+        avatar_url:
+          type: string
+          example: https://example.com/new-avatar.jpg
+
+    UserStatsResponse:
+      type: object
+      properties:
+        total_projects_owned:
+          type: integer
+          description: Количество созданных проектов
+          example: 5
+        total_tasks_assigned:
+          type: integer
+          description: Количество назначенных задач
+          example: 12
+        total_teams:
+          type: integer
+          description: Количество команд, в которых состоит пользователь
+          example: 3
+        total_completed_tasks:
+          type: integer
+          description: Количество выполненных задач
+          example: 8
+
+    # ── SKILLS ──
+    SkillResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Python
+        category:
+          type: string
+          example: Programming
+
+    CreateSkillRequest:
+      type: object
+      required: [name, category]
+      properties:
+        name:
+          type: string
+          maxLength: 128
+          example: FastAPI
+        category:
+          type: string
+          maxLength: 64
+          example: Backend
+
+    UserSkillResponse:
+      type: object
+      properties:
+        skill:
+          $ref: '#/components/schemas/SkillResponse'
+        proficiency_level:
+          $ref: '#/components/schemas/ProficiencyLevel'
+
+    AddUserSkillRequest:
+      type: object
+      required: [skill_id, proficiency_level]
+      properties:
+        skill_id:
+          type: integer
+          example: 1
+        proficiency_level:
+          $ref: '#/components/schemas/ProficiencyLevel'
+
+    # ── PROJECTS ──
+    ProjectResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        owner_id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: E-commerce Platform
+        description:
+          type: string
+          example: Building a modern e-commerce platform
+        status:
+          $ref: '#/components/schemas/ProjectStatus'
+        deadline:
+          type: string
+          format: date
+          nullable: true
+          example: 2024-12-31
+        created_at:
+          type: string
+          format: date-time
+          example: 2024-01-01T00:00:00Z
+        updated_at:
+          type: string
+          format: date-time
+          example: 2024-01-15T00:00:00Z
+
+    ProjectDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/ProjectResponse'
+        - type: object
+          properties:
+            required_skills:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProjectSkillResponse'
+            teams:
+              type: array
+              items:
+                $ref: '#/components/schemas/TeamResponse'
+
+    ProjectListResponse:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectResponse'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    CreateProjectRequest:
+      type: object
+      required: [title, description]
+      properties:
+        title:
+          type: string
+          maxLength: 256
+          example: AI Chatbot
+        description:
+          type: string
+          example: Developing an AI-powered chatbot
+        deadline:
+          type: string
+          format: date
+          nullable: true
+          example: 2024-06-30
+
+    UpdateProjectRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          example: AI Chatbot v2
+        description:
+          type: string
+          example: Updated description
+        status:
+          $ref: '#/components/schemas/ProjectStatus'
+        deadline:
+          type: string
+          format: date
+          nullable: true
+          example: 2024-07-31
+
+    ProjectSkillResponse:
+      type: object
+      properties:
+        skill:
+          $ref: '#/components/schemas/SkillResponse'
+        importance:
+          $ref: '#/components/schemas/SkillImportance'
+
+    AddProjectSkillRequest:
+      type: object
+      required: [skill_id, importance]
+      properties:
+        skill_id:
+          type: integer
+          example: 1
+        importance:
+          $ref: '#/components/schemas/SkillImportance'
+
+    # ── TEAMS ──
+    TeamResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        project_id:
+          type: integer
+          example: 1
+        created_by:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Backend Team
+        description:
+          type: string
+          nullable: true
+          example: Responsible for API development
+        created_at:
+          type: string
+          format: date-time
+          example: 2024-01-01T00:00:00Z
+
+    TeamDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/TeamResponse'
+        - type: object
+          properties:
+            members:
+              type: array
+              items:
+                $ref: '#/components/schemas/TeamMemberResponse'
+
+    TeamListResponse:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamResponse'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    CreateTeamRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 256
+          example: Frontend Team
+        description:
+          type: string
+          example: UI/UX and frontend development
+
+    UpdateTeamRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Frontend Core Team
+        description:
+          type: string
+          example: Updated description
+
+    TeamMemberResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserResponse'
+        role_in_team:
+          $ref: '#/components/schemas/TeamRole'
+        status:
+          $ref: '#/components/schemas/MemberStatus'
+        joined_at:
+          type: string
+          format: date-time
+          example: 2024-01-01T00:00:00Z
+
+    InviteMemberRequest:
+      type: object
+      required: [user_id, role_in_team]
+      properties:
+        user_id:
+          type: integer
+          example: 2
+        role_in_team:
+          $ref: '#/components/schemas/TeamRole'
+
+    UpdateMemberRequest:
+      type: object
+      properties:
+        role_in_team:
+          $ref: '#/components/schemas/TeamRole'
+        status:
+          $ref: '#/components/schemas/MemberStatus'
+
+    # ── TASKS ──
+    TaskResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        project_id:
+          type: integer
+          example: 1
+        assignee_id:
+          type: integer
+          nullable: true
+          example: 2
+        title:
+          type: string
+          example: Implement authentication
+        description:
+          type: string
+          nullable: true
+          example: Add JWT authentication to the API
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        priority:
+          $ref: '#/components/schemas/TaskPriority'
+        due_date:
+          type: string
+          format: date
+          nullable: true
+          example: 2024-02-15
+        created_at:
+          type: string
+          format: date-time
+          example: 2024-01-01T00:00:00Z
+        updated_at:
+          type: string
+          format: date-time
+          example: 2024-01-10T00:00:00Z
+
+    TaskListResponse:
+      type: object
+      required: [items, pagination]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskResponse'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    CreateTaskRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          maxLength: 256
+          example: Setup database
+        description:
+          type: string
+          example: Create PostgreSQL schema
+        assignee_id:
+          type: integer
+          nullable: true
+          example: 3
+        priority:
+          $ref: '#/components/schemas/TaskPriority'
+        due_date:
+          type: string
+          format: date
+          nullable: true
+          example: 2024-01-20
+
+    UpdateTaskRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          example: Update database schema
+        description:
+          type: string
+          nullable: true
+          example: Add indexes for performance
+        assignee_id:
+          type: integer
+          nullable: true
+          example: 4
+        status:
+          $ref: '#/components/schemas/TaskStatus'
+        priority:
+          $ref: '#/components/schemas/TaskPriority'
+        due_date:
+          type: string
+          format: date
+          nullable: true
+          example: 2024-01-25
+
+    # ── ADMIN ──
+    AdminStatsResponse:
+      type: object
+      properties:
+        total_users:
+          type: integer
+          description: Общее количество пользователей
+          example: 150
+        total_projects:
+          type: integer
+          description: Общее количество проектов
+          example: 45
+        total_active_projects:
+          type: integer
+          description: Количество активных проектов (OPEN и IN_PROGRESS)
+          example: 28
+        total_teams:
+          type: integer
+          description: Общее количество команд
+          example: 67
+        total_tasks:
+          type: integer
+          description: Общее количество задач
+          example: 342
+        total_tasks_completed:
+          type: integer
+          description: Количество выполненных задач
+          example: 156
+        popular_skills:
+          type: array
+          description: Топ-5 самых популярных навыков
+          items:
+            type: object
+            properties:
+              skill_name:
+                type: string
+                example: Python
+              count:
+                type: integer
+                example: 89
+        projects_by_status:
+          type: object
+          description: Распределение проектов по статусам
+          additionalProperties:
+            type: integer
+          example:
+            DRAFT: 5
+            OPEN: 15
+            IN_PROGRESS: 13
+            COMPLETED: 10
+            ARCHIVED: 2
+
+    # ── ОШИБКИ ──
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: integer
+              example: 404
+            message:
+              type: string
+              example: Resource not found
+            details:
+              type: object
+              description: Дополнительные сведения об ошибке
+              additionalProperties: true
+              nullable: true
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          required: [code, message, details]
+          properties:
+            code:
+              type: integer
+              example: 422
+            message:
+              type: string
+              example: Validation error
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  loc:
+                    type: array
+                    items:
+                      type: string
+                    example: ["body", "email"]
+                  msg:
+                    type: string
+                    example: field required
+                  type:
+                    type: string
+                    example: missing
