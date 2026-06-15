@@ -1,3 +1,4 @@
+# models.py
 from enum import Enum
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
@@ -22,6 +23,7 @@ class SkillWarriorLink(SQLModel, table=True):
         foreign_key="warrior.id",
         primary_key=True
     )
+    level: Optional[int] = None  # НОВОЕ ПОЛЕ: уровень владения умением
     created_at: datetime = Field(default_factory=datetime.now)
 
 # ============= Модель умения =============

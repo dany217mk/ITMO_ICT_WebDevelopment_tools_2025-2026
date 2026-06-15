@@ -1,13 +1,26 @@
+# connection.py
+import os
 from sqlmodel import SQLModel, Session, create_engine
 from sqlalchemy.pool import NullPool
+from dotenv import load_dotenv
 
-# URL подключения к БД
-# postgresql://пользователь:пароль@хост:порт/имя_базы
-db_url = 'postgresql://postgres:password@localhost:5432/warriors_db'
+# Загружаем переменные окружения из .env файла
+load_dotenv()
+
+# Получаем URL базы данных из переменных окружения
+db_url = os.getenv('DB_ADMIN', 'postgresql://postgres:123@localhost:5432/warriors_db')
+
+# Дополнительные параметры для подключения
+# echo=True - выводит SQL-запросы в консоль (только для разработки)
+echo_mode = os.getenv('DEBUG', 'True').lower() == 'true'
 
 # Создаем движок БД
-# echo=True - выводит все SQL-запросы в консоль (полезно для отладки)
-engine = create_engine(db_url, echo=True, poolclass=NullPool)
+engine = create_engine(
+    db_url,
+    echo=echo_mode,
+    poolclass=NullPool,
+    pool_pre_ping=True  # Проверяет соединение перед использованием
+)
 
 def init_db():
     """Создает все таблицы в БД на основе моделей"""

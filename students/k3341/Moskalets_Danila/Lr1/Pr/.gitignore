@@ -1,0 +1,75 @@
+# Виртуальное окружение
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+pythonenv*
+
+# Файлы с переменными окружения (ВАЖНО!)
+.env
+.env.local
+.env.*.local
+
+# Alembic миграции (сами файлы миграций храним, но бэкапы исключаем)
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+
+# IDE и редакторы
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+.settings/
+*.sublime-*
+*.code-workspace
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Файлы логов
+*.log
+log.txt
+logs/
+
+# Базы данных (если локальные)
+*.db
+*.sqlite
+*.sqlite3
+
+# Файлы pytest
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+
+# Файлы документации
+docs/_build/
+site_build/
+
+# Архивы
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Временные файлы
+tmp/
+temp/
+*.tmp
+
+# Файлы окружения Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Файлы дистрибуции
+dist/
+build/
+*.egg-info/
+*.egg
