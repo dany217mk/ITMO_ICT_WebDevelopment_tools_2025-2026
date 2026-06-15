@@ -37,8 +37,8 @@
 ### 2.3 Результаты выполнения 
 
 ![1](imgs/lr2/task1_threading.png)
-![1](imgs/lr2/task1_multiprocessing.png)
-![1](imgs/lr2/task1_async.png)
+![2](imgs/lr2/task1_multiprocessing.png)
+![3](imgs/lr2/task1_async.png)
 
 ### 2.4 Итоги 
 1. Multiprocessing оказался самым быстрым (2.57 сек), так как каждый процесс имеет свой GIL и выполняется на отдельном ядре процессора, обеспечивая реальный параллелизм.
@@ -73,9 +73,9 @@
 
 ### 3.3 Результаты выполнения
 
-- ![Threading](https://imgs/lr2/task2_threading.png)
-- ![Multiprocessing](https://imgs/lr2/task2_multiprocessing.png)
-- ![Async](https://imgs/lr2/task2_async.png)
+- ![Threading](imgs/lr2/task2_threading.png)
+- ![Multiprocessing](imgs/lr2/task2_multiprocessing.png)
+- ![Async](imgs/lr2/task2_async.png)
 
 ### 3.4 Выводы (Задание 2)
 

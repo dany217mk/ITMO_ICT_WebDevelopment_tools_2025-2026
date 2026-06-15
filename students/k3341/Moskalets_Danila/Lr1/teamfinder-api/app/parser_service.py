@@ -4,7 +4,7 @@
 import asyncio
 import aiohttp
 from bs4 import BeautifulSoup
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 import asyncpg
 from app.core.config import settings
 
@@ -184,9 +184,9 @@ async def parse_single_source(session, pool, url: str, source_type: str) -> Dict
         }
 
 
-async def run_parser(url: str = None) -> List[Dict[str, Any]]:
+async def run_parser_async(url: Optional[str] = None) -> List[Dict[str, Any]]:
     """
-    Запуск парсера
+    Асинхронный запуск парсера
     
     Args:
         url: конкретный URL для парсинга (если None - парсит все)
@@ -198,7 +198,6 @@ async def run_parser(url: str = None) -> List[Dict[str, Any]]:
     
     # Определяем какие URL парсить
     if url:
-        # Находим тип источника по URL
         source_type = None
         for u, t in URLS:
             if u == url:
@@ -220,6 +219,20 @@ async def run_parser(url: str = None) -> List[Dict[str, Any]]:
     return results
 
 
-def run_parser_sync(url: str = None) -> List[Dict[str, Any]]:
-    """Синхронная обертка для вызова парсера"""
-    return asyncio.run(run_parser(url))
+# Оставляем синхронную обертку для совместимости с Celery
+def run_parser_sync(url: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Синхронная обертка для вызова парсера (для Celery)
+    """
+    try:
+        # Пытаемся получить текущий event loop
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # Нет запущенного event loop - можно использовать asyncio.run()
+        return asyncio.run(run_parser_async(url))
+    else:
+        # Уже есть запущенный event loop - создаем новый в отдельном потоке
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(asyncio.run, run_parser_async(url))
+            return future.result()
